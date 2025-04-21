@@ -16,9 +16,33 @@ function openTab(tabName) {
 
 // Initialize localStorage if empty
 if (!localStorage.getItem('users')) {
-    localStorage.setItem('users', JSON.stringify([]));
+    const defaultUsers = [
+        {
+            id: 1,
+            name: "Admin",
+            email: "admin@quiz.com",
+            password: "admin123",
+            isAdmin: true,
+            scores: {}
+        }
+    ];
+    localStorage.setItem('users', JSON.stringify(defaultUsers));
+} else {
+    // Check if admin exists in existing users
+    const users = JSON.parse(localStorage.getItem('users'));
+    const adminExists = users.some(u => u.email === "admin@quiz.com");
+    if (!adminExists) {
+        users.push({
+            id: Date.now(),
+            name: "Admin",
+            email: "admin@quiz.com",
+            password: "admin123",
+            isAdmin: true,
+            scores: {}
+        });
+        localStorage.setItem('users', JSON.stringify(users));
+    }
 }
-
 if (!localStorage.getItem('quizzes')) {
     const defaultQuizzes = [
         {
@@ -272,9 +296,62 @@ function loadQuizPage() {
     }
 }
 
+// Dashboard Page Functionality
+function loadDashboardPage() {
+    // Check if user is admin
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    if (!currentUser || !currentUser.isAdmin) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // Load all users
+    const users = JSON.parse(localStorage.getItem('users'));
+    const quizzes = JSON.parse(localStorage.getItem('quizzes'));
+    const usersTable = document.getElementById('usersTable').getElementsByTagName('tbody')[0];
+    
+    usersTable.innerHTML = ''; // Clear previous content
+    
+    users.forEach(user => {
+        if (user.isAdmin) return; // Skip admin in listing
+        
+        const row = document.createElement('tr');
+        
+        // Calculate quizzes taken and scores
+        const quizzesTaken = Object.keys(user.scores || {}).length;
+        let scoresHtml = '';
+        
+        if (user.scores) {
+            scoresHtml = Object.entries(user.scores).map(([quizId, score]) => {
+                const quiz = quizzes.find(q => q.id == quizId);
+                return quiz ? `${quiz.title}: ${score}/${quiz.questions.length}` : '';
+            }).filter(Boolean).join('<br>');
+        }
+        
+        row.innerHTML = `
+            <td>${user.name}</td>
+            <td>${user.email}</td>
+            <td>${quizzesTaken}</td>
+            <td>${scoresHtml || 'No scores yet'}</td>
+        `;
+        usersTable.appendChild(row);
+    });
+
+    // Logout button
+    const logoutBtn = document.getElementById('dashboardLogoutBtn');
+    if (logoutBtn) {
+        logoutBtn.onclick = function() {
+            localStorage.removeItem('currentUser');
+            window.location.href = 'index.html';
+        };
+    }
+}
+
 // Page initialization
 if (document.getElementById('quizList')) {  // Home page
     loadHomePage();
 } else if (document.getElementById('quizForm')) {  // Quiz page
     loadQuizPage();
+} else if (document.getElementById('usersTable')) {  // Dashboard page
+    loadDashboardPage();
 }
